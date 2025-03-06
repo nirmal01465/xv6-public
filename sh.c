@@ -1,8 +1,16 @@
-// Shell.
-
 #include "types.h"
+
+#define memmove _xv6_memmove
+#define strchr  _xv6_strchr
 #include "user.h"
+#undef memmove
+#undef strchr
+
 #include "fcntl.h"
+#include "string.h"
+
+
+#define MAXARGS 10
 
 // Parsed command representation
 #define EXEC  1
@@ -10,8 +18,6 @@
 #define PIPE  3
 #define LIST  4
 #define BACK  5
-
-#define MAXARGS 10
 
 struct cmd {
   int type;
@@ -141,6 +147,12 @@ getcmd(char *buf, int nbuf)
   return 0;
 }
 
+void *__strcpy_chk(void *dest, const void *src, size_t destlen) {
+  // Simply call the normal strcpy since we're not performing extra bounds checks.
+  return strcpy(dest, src);
+}
+
+
 int
 main(void)
 {
@@ -157,19 +169,67 @@ main(void)
 
   // Read and run input commands.
   while(getcmd(buf, sizeof(buf)) >= 0){
+    // Remove trailing newline.
     buf[strlen(buf)-1] = '\0';
-    if(buf[0] == 'c' && buf[1] == 'd' && buf[2] == ' '){
-      // Chdir must be called by the parent, not the child.
-      //buf[strlen(buf)-1] = 0;  // chop \n
+    if(buf[0] == 0)
+      continue;
+
+    // Built-in: cd
+    if(buf[0]=='c' && buf[1]=='d' && buf[2]==' '){
       if(chdir(buf+3) < 0)
         printf(2, "cannot cd %s\n", buf+3);
       continue;
     }
+
+    // Built-in: history
     if(strcmp(buf, "history") == 0){
       if(gethistory() < 0)
         printf(2, "Error retrieving history\n");
       continue;
     }
+
+    // Create a copy of the command for tokenization.
+    char buf_copy[100];
+    strcpy(buf_copy, buf);
+
+    // Tokenize to build argv[] and count argc.
+    char *argv[MAXARGS];
+    int argc = 0;
+    char *token = strtok(buf_copy, " ");
+    while(token != 0 && argc < MAXARGS){
+      argv[argc++] = token;
+      token = strtok(0, " ");
+    }
+    
+    // Built-in: block
+    if(argc > 0 && strcmp(argv[0], "block") == 0){
+      if(argc < 2){
+        printf(2, "Usage: block <syscall_id>\n");
+      } else {
+        int syscall_id = atoi(argv[1]);
+        if(block(syscall_id) == 0)
+          printf(1, "Syscall %d is blocked.\n", syscall_id);
+        else
+          printf(2, "Failed to block syscall %d.\n", syscall_id);
+      }
+      continue;
+    }
+    
+    // Built-in: unblock
+    if(argc > 0 && strcmp(argv[0], "unblock") == 0){
+      if(argc < 2){
+        printf(2, "Usage: unblock <syscall_id>\n");
+      } else {
+        int syscall_id = atoi(argv[1]);
+        if(unblock(syscall_id) == 0)
+          printf(1, "Syscall %d is now unblocked.\n", syscall_id);
+        else
+          printf(2, "Failed to unblock syscall %d.\n", syscall_id);
+      }
+      continue;
+    }
+
+    // Not a built-in command; run it normally.
     if(fork1() == 0)
       runcmd(parsecmd(buf));
     wait();
@@ -188,7 +248,6 @@ int
 fork1(void)
 {
   int pid;
-
   pid = fork();
   if(pid == -1)
     panic("fork");
@@ -202,7 +261,6 @@ struct cmd*
 execcmd(void)
 {
   struct execcmd *cmd;
-
   cmd = malloc(sizeof(*cmd));
   memset(cmd, 0, sizeof(*cmd));
   cmd->type = EXEC;
@@ -213,7 +271,6 @@ struct cmd*
 redircmd(struct cmd *subcmd, char *file, char *efile, int mode, int fd)
 {
   struct redircmd *cmd;
-
   cmd = malloc(sizeof(*cmd));
   memset(cmd, 0, sizeof(*cmd));
   cmd->type = REDIR;
@@ -229,7 +286,6 @@ struct cmd*
 pipecmd(struct cmd *left, struct cmd *right)
 {
   struct pipecmd *cmd;
-
   cmd = malloc(sizeof(*cmd));
   memset(cmd, 0, sizeof(*cmd));
   cmd->type = PIPE;
@@ -242,7 +298,6 @@ struct cmd*
 listcmd(struct cmd *left, struct cmd *right)
 {
   struct listcmd *cmd;
-
   cmd = malloc(sizeof(*cmd));
   memset(cmd, 0, sizeof(*cmd));
   cmd->type = LIST;
@@ -255,13 +310,13 @@ struct cmd*
 backcmd(struct cmd *subcmd)
 {
   struct backcmd *cmd;
-
   cmd = malloc(sizeof(*cmd));
   memset(cmd, 0, sizeof(*cmd));
   cmd->type = BACK;
   cmd->cmd = subcmd;
   return (struct cmd*)cmd;
 }
+
 //PAGEBREAK!
 // Parsing
 
@@ -273,7 +328,6 @@ gettoken(char **ps, char *es, char **q, char **eq)
 {
   char *s;
   int ret;
-
   s = *ps;
   while(s < es && strchr(whitespace, *s))
     s++;
@@ -306,7 +360,6 @@ gettoken(char **ps, char *es, char **q, char **eq)
   }
   if(eq)
     *eq = s;
-
   while(s < es && strchr(whitespace, *s))
     s++;
   *ps = s;
@@ -317,7 +370,6 @@ int
 peek(char **ps, char *es, char *toks)
 {
   char *s;
-
   s = *ps;
   while(s < es && strchr(whitespace, *s))
     s++;
@@ -335,7 +387,6 @@ parsecmd(char *s)
 {
   char *es;
   struct cmd *cmd;
-
   es = s + strlen(s);
   cmd = parseline(&s, es);
   peek(&s, es, "");
@@ -351,7 +402,6 @@ struct cmd*
 parseline(char **ps, char *es)
 {
   struct cmd *cmd;
-
   cmd = parsepipe(ps, es);
   while(peek(ps, es, "&")){
     gettoken(ps, es, 0, 0);
@@ -368,7 +418,6 @@ struct cmd*
 parsepipe(char **ps, char *es)
 {
   struct cmd *cmd;
-
   cmd = parseexec(ps, es);
   if(peek(ps, es, "|")){
     gettoken(ps, es, 0, 0);
@@ -382,7 +431,6 @@ parseredirs(struct cmd *cmd, char **ps, char *es)
 {
   int tok;
   char *q, *eq;
-
   while(peek(ps, es, "<>")){
     tok = gettoken(ps, es, 0, 0);
     if(gettoken(ps, es, &q, &eq) != 'a')
@@ -406,7 +454,6 @@ struct cmd*
 parseblock(char **ps, char *es)
 {
   struct cmd *cmd;
-
   if(!peek(ps, es, "("))
     panic("parseblock");
   gettoken(ps, es, 0, 0);
@@ -425,13 +472,10 @@ parseexec(char **ps, char *es)
   int tok, argc;
   struct execcmd *cmd;
   struct cmd *ret;
-
   if(peek(ps, es, "("))
     return parseblock(ps, es);
-
   ret = execcmd();
   cmd = (struct execcmd*)ret;
-
   argc = 0;
   ret = parseredirs(ret, ps, es);
   while(!peek(ps, es, "|)&;")){
@@ -461,39 +505,61 @@ nulterminate(struct cmd *cmd)
   struct listcmd *lcmd;
   struct pipecmd *pcmd;
   struct redircmd *rcmd;
-
   if(cmd == 0)
     return 0;
-
   switch(cmd->type){
   case EXEC:
     ecmd = (struct execcmd*)cmd;
     for(i=0; ecmd->argv[i]; i++)
       *ecmd->eargv[i] = 0;
     break;
-
   case REDIR:
     rcmd = (struct redircmd*)cmd;
     nulterminate(rcmd->cmd);
     *rcmd->efile = 0;
     break;
-
   case PIPE:
     pcmd = (struct pipecmd*)cmd;
     nulterminate(pcmd->left);
     nulterminate(pcmd->right);
     break;
-
   case LIST:
     lcmd = (struct listcmd*)cmd;
     nulterminate(lcmd->left);
     nulterminate(lcmd->right);
     break;
-
   case BACK:
     bcmd = (struct backcmd*)cmd;
     nulterminate(bcmd->cmd);
     break;
   }
   return cmd;
+}
+
+/* Minimal implementation of strtok for xv6.
+ * Splits the string s into tokens separated by any character in delim.
+ * Subsequent calls with s == 0 continue tokenizing the same string.
+ */
+char*
+strtok(char *s, const char *delim)
+{
+  static char *next;
+  if(s)
+    next = s;
+  if(next == 0)
+    return 0;
+  // Skip leading delimiters.
+  while(*next && strchr(delim, *next))
+    next++;
+  if(*next == '\0')
+    return 0;
+  char *start = next;
+  // Find the next delimiter.
+  while(*next && !strchr(delim, *next))
+    next++;
+  if(*next){
+    *next = '\0';
+    next++;
+  }
+  return start;
 }

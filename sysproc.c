@@ -6,6 +6,7 @@
 #include "memlayout.h"
 #include "mmu.h"
 #include "proc.h"
+#include "syscall.h"
 //#include "exec.c"
 
 
@@ -107,4 +108,35 @@ sys_uptime(void)
   xticks = ticks;
   release(&tickslock);
   return xticks;
+}
+int
+sys_block(void)
+{
+  int syscall_id;
+  if(argint(0, &syscall_id) < 0)
+    return -1;
+
+  // Prevent blocking critical syscalls: fork and exit.
+  if(syscall_id == SYS_fork || syscall_id == SYS_exit)
+    return -1;
+
+  struct proc *curproc = myproc();
+  curproc->blocked_mask |= (1 << syscall_id);
+  return 0;
+}
+
+// Unblock a system call for the current process.
+int
+sys_unblock(void)
+{
+  int syscall_id;
+  if(argint(0, &syscall_id) < 0)
+    return -1;
+
+  if(syscall_id == SYS_fork || syscall_id == SYS_exit)
+    return -1;
+
+  struct proc *curproc = myproc();
+  curproc->blocked_mask &= ~(1 << syscall_id);
+  return 0;
 }

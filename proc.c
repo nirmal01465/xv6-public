@@ -83,18 +83,17 @@ allocproc(void)
   char *sp;
 
   acquire(&ptable.lock);
-
-  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++)
+  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
     if(p->state == UNUSED)
       goto found;
-
+  }
   release(&ptable.lock);
   return 0;
 
 found:
   p->state = EMBRYO;
   p->pid = nextpid++;
-
+  p->blocked_mask = 0;  // Initialize the blocked_mask here, after p is assigned.
   release(&ptable.lock);
 
   // Allocate kernel stack.
@@ -120,6 +119,7 @@ found:
 
   return p;
 }
+
 
 //PAGEBREAK: 32
 // Set up first user process.

@@ -8,7 +8,17 @@
 #include "user.h"
 
 
+//int
+//block(int syscall_id)
+//{
+//  return syscall(SYS_block, syscall_id);
+//}
 
+//int
+//unblock(int syscall_id)
+//{
+//  return syscall(SYS_unblock, syscall_id);
+//}
 
 char*
 strcpy(char *s, const char *t)

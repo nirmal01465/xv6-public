@@ -41,3 +41,5 @@ void* malloc(uint);
 void free(void*);
 int atoi(const char*);
 int gethistory(void);
+int block(int);
+int unblock(int);
