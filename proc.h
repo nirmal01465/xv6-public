@@ -1,3 +1,4 @@
+
 // Per-CPU state
 struct cpu {
   uchar apicid;                // Local APIC ID
@@ -13,7 +14,7 @@ struct cpu {
 extern struct cpu cpus[NCPU];
 extern int ncpu;
 
-//PAGEBREAK: 17
+// PAGEBREAK: 17
 // Saved registers for kernel context switches.
 // Don't need to save all the segment registers (%cs, etc),
 // because they are constant across kernel contexts.
@@ -50,6 +51,24 @@ struct proc {
   struct inode *cwd;           // Current directory
   char name[16];               // Process name (debugging)
 };
+
+// ---------------------------------------------------------------------
+// History tracking for executed processes.
+//
+// This structure is used to record the history of executed processes.
+// Each entry stores the process id, its name, and total memory utilization.
+// ---------------------------------------------------------------------
+#define MAX_HISTORY_ENTRIES 128
+#define MAX_NAME_LEN 16
+
+struct history_entry {
+  int pid;
+  char name[MAX_NAME_LEN];
+  int mem_usage;  // Total memory in bytes (text, bss, data, stack, heap)
+};
+
+extern struct history_entry history_list[MAX_HISTORY_ENTRIES];
+extern int history_count;
 
 // Process memory is laid out contiguously, low addresses first:
 //   text

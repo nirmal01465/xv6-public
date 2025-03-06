@@ -6,6 +6,10 @@
 #include "memlayout.h"
 #include "mmu.h"
 #include "proc.h"
+//#include "exec.c"
+
+
+
 
 int
 sys_fork(void)
@@ -18,6 +22,21 @@ sys_exit(void)
 {
   exit();
   return 0;  // not reached
+}
+
+int sys_gethistory(void) {
+  // If no history is recorded, return -1.
+  if(history_count <= 0)
+    return -1;
+
+  // Print each history entry: pid, process name, and memory usage.
+  // (Sorted in order of execution since entries are appended.)
+  for (int i = 0; i < history_count; i++) {
+    cprintf("%d %s %d\n", history_list[i].pid,
+                           history_list[i].name,
+                           history_list[i].mem_usage);
+  }
+  return 0;
 }
 
 int

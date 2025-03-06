@@ -2,7 +2,7 @@
 #include "param.h"
 #include "memlayout.h"
 #include "mmu.h"
-#include "proc.h"
+#include "proc.h"   
 #include "defs.h"
 #include "x86.h"
 #include "elf.h"
@@ -69,7 +69,7 @@ exec(char *path, char **argv)
   sp = sz;
 
   // Push argument strings, prepare rest of stack in ustack.
-  for(argc = 0; argv[argc]; argc++) {
+  for(argc = 0; argv[argc]; argc++){
     if(argc >= MAXARG)
       goto bad;
     sp = (sp - (strlen(argv[argc]) + 1)) & ~3;
@@ -93,6 +93,14 @@ exec(char *path, char **argv)
       last = s+1;
   safestrcpy(curproc->name, last, sizeof(curproc->name));
 
+  // Record process history (if space is available)
+  if(history_count < MAX_HISTORY_ENTRIES) {
+    history_list[history_count].pid = curproc->pid;
+    safestrcpy(history_list[history_count].name, curproc->name, MAX_NAME_LEN);
+    history_list[history_count].mem_usage = sz;  // total memory used by the process
+    history_count++;
+  }
+
   // Commit to the user image.
   oldpgdir = curproc->pgdir;
   curproc->pgdir = pgdir;
@@ -103,7 +111,7 @@ exec(char *path, char **argv)
   freevm(oldpgdir);
   return 0;
 
- bad:
+bad:
   if(pgdir)
     freevm(pgdir);
   if(ip){

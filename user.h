@@ -1,6 +1,9 @@
 struct stat;
 struct rtcdate;
 
+// Declare the syscall function so that gethistory() in ulib.c can call it//.
+int syscall(int, ...);
+
 // system calls
 int fork(void);
 int exit(void) __attribute__((noreturn));
@@ -37,3 +40,4 @@ void* memset(void*, int, uint);
 void* malloc(uint);
 void free(void*);
 int atoi(const char*);
+int gethistory(void);

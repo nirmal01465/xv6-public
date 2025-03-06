@@ -7,6 +7,12 @@
 #include "proc.h"
 #include "spinlock.h"
 
+
+
+// Global array to hold history entries and a counter.
+struct history_entry history_list[MAX_HISTORY_ENTRIES];
+int history_count = 0;
+
 struct {
   struct spinlock lock;
   struct proc proc[NPROC];
